@@ -16,7 +16,6 @@ class Cluster:
     def __init__(self, config):
         self.config = config
         self.dashboard_class = NullDashboard
-        self.dashboard = NullDashboard(None)
         self.connected = False
 
     def connect(self):
@@ -86,7 +85,7 @@ class Cluster:
         code = get_code_unary(func, mem_i0, mem_i1, kernel_id)
         ws_url = self.config['kernels'][kernel_id]['ws_url']
         async with self.state.kernel_free[kernel_id]:
-            await self.run_in_kernel(kernel_id, ws_url, code)
+            await self.run_in_kernel(kernel_id, ws_url, code, func)
 
     async def binary_func(self, func, mem_i0, mem_i1, mem_i2, kernel_id, await_tasks=[]):
         for t in await_tasks:
@@ -94,19 +93,20 @@ class Cluster:
         code = get_code_binary(func, mem_i0, mem_i1, mem_i2, kernel_id)
         ws_url = self.config['kernels'][kernel_id]['ws_url']
         async with self.state.kernel_free[kernel_id]:
-            await self.run_in_kernel(kernel_id, ws_url, code)
+            await self.run_in_kernel(kernel_id, ws_url, code, func)
 
     async def free_mem(self, mem, kernel_id, await_tasks=[]):
         for t in await_tasks:
             await t
         self.state.mem_free(kernel_id, len(mem))
 
-    async def run_in_kernel(self, kernel_id, ws_url, code):
+    async def run_in_kernel(self, kernel_id, ws_url, code, func=None):
         msg_id = str(uuid.uuid4())
         ws = self.config['kernels'][kernel_id]['ws']
         j = request_execute_code(msg_id, code)
         await ws.send_json(j)
-        self.dashboard.set(kernel_id, time(), 'Green')
+        if func is not None:
+            self.dashboard.set(kernel_id, time(), 'Green', 'idle')
         async for msg_text in ws:
             msg = msg_text.json()
             if 'parent_header' in msg and msg['parent_header'].get('msg_id') == msg_id:
@@ -116,7 +116,8 @@ class Cluster:
                             break
                         else:
                             print(msg['content']['traceback'])
-        self.dashboard.set(kernel_id, time(), 'White')
+        if func is not None:
+            self.dashboard.set(kernel_id, time(), 'White', func)
 
 
 def request_execute_code(msg_id, code):
