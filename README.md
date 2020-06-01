@@ -1,3 +1,5 @@
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/davidbrochart/jupytexpr/master?filepath=examples%2Fintroduction.ipynb)
+
 # Jupytexpr
 
 I have no idea what this project is, but it is inspired by

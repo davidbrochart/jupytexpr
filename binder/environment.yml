@@ -1,0 +1,7 @@
+name: jupytexpr
+channels:
+  - conda-forge
+dependencies:
+  - pip
+  - pip:
+    - git+https://github.com/davidbrochart/jupytexpr.git#egg=jupytexpr

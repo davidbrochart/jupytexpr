@@ -83,7 +83,7 @@ class Cluster:
     async def unary_func(self, func, mem_i0, mem_i1, kernel_id, await_tasks=[]):
         for t in await_tasks:
             await t
-        code = self.get_code_unary(func, mem_i0, mem_i1, kernel_id)
+        code = get_code_unary(func, mem_i0, mem_i1, kernel_id)
         ws_url = self.config['kernels'][kernel_id]['ws_url']
         async with self.state.kernel_free[kernel_id]:
             await self.run_in_kernel(kernel_id, ws_url, code)
@@ -91,7 +91,7 @@ class Cluster:
     async def binary_func(self, func, mem_i0, mem_i1, mem_i2, kernel_id, await_tasks=[]):
         for t in await_tasks:
             await t
-        code = self.get_code_binary(func, mem_i0, mem_i1, mem_i2, kernel_id)
+        code = get_code_binary(func, mem_i0, mem_i1, mem_i2, kernel_id)
         ws_url = self.config['kernels'][kernel_id]['ws_url']
         async with self.state.kernel_free[kernel_id]:
             await self.run_in_kernel(kernel_id, ws_url, code)
@@ -101,55 +101,10 @@ class Cluster:
             await t
         self.state.mem_free(kernel_id, len(mem))
 
-    def request_execute_code(self, msg_id, code):
-        return {
-            "header": {
-                "msg_id": msg_id,
-                "username": 'fakeusername',
-                "msg_type": "execute_request",
-                "version": "5.2"
-            },
-            "metadata": {},
-            "content": {
-                "code": code,
-                "silent": False,
-                "store_history": True,
-                "user_expressions": {},
-                "allow_stdin": True,
-                "stop_on_error": True
-            },
-            "buffers": [],
-            "parent_header": {},
-            "channel": "shell"
-        }
-
-    def get_code_unary(self, func, mem_i0, mem_i1, kernel_id):
-        code = []
-        code.append(f"with open('{mem_i0}', 'rb') as f:")
-        code.append("    a0 = pickle.load(f)")
-        code.append(f"r = np.__getattribute__('{func}')(a0)")
-        code.append(f"r = np.__getattribute__('{func}')(a0)")
-        code.append(f"with open('{mem_i1}', 'wb') as f:")
-        code.append("    pickle.dump(r, f)")
-        code = '\n'.join(code)
-        return code
-
-    def get_code_binary(self, func, mem_i0, mem_i1, mem_i2, kernel_id):
-        code = []
-        code.append(f"with open('{mem_i0}', 'rb') as f:")
-        code.append("    a0 = pickle.load(f)")
-        code.append(f"with open('{mem_i1}', 'rb') as f:")
-        code.append("    a1 = pickle.load(f)")
-        code.append(f"r = np.__getattribute__('{func}')(a0, a1)")
-        code.append(f"with open('{mem_i2}', 'wb') as f:")
-        code.append("    pickle.dump(r, f)")
-        code = '\n'.join(code)
-        return code
-
     async def run_in_kernel(self, kernel_id, ws_url, code):
         msg_id = str(uuid.uuid4())
         ws = self.config['kernels'][kernel_id]['ws']
-        j = self.request_execute_code(msg_id, code)
+        j = request_execute_code(msg_id, code)
         await ws.send_json(j)
         self.dashboard.set(kernel_id, time(), 'Green')
         async for msg_text in ws:
@@ -162,3 +117,49 @@ class Cluster:
                         else:
                             print(msg['content']['traceback'])
         self.dashboard.set(kernel_id, time(), 'White')
+
+
+def request_execute_code(msg_id, code):
+    return {
+        "header": {
+            "msg_id": msg_id,
+            "username": 'fakeusername',
+            "msg_type": "execute_request",
+            "version": "5.2"
+        },
+        "metadata": {},
+        "content": {
+            "code": code,
+            "silent": False,
+            "store_history": True,
+            "user_expressions": {},
+            "allow_stdin": True,
+            "stop_on_error": True
+        },
+        "buffers": [],
+        "parent_header": {},
+        "channel": "shell"
+    }
+
+def get_code_unary(func, mem_i0, mem_i1, kernel_id):
+    code = []
+    code.append(f"with open('{mem_i0}', 'rb') as f:")
+    code.append("    a0 = pickle.load(f)")
+    code.append(f"r = np.__getattribute__('{func}')(a0)")
+    code.append(f"r = np.__getattribute__('{func}')(a0)")
+    code.append(f"with open('{mem_i1}', 'wb') as f:")
+    code.append("    pickle.dump(r, f)")
+    code = '\n'.join(code)
+    return code
+
+def get_code_binary(func, mem_i0, mem_i1, mem_i2, kernel_id):
+    code = []
+    code.append(f"with open('{mem_i0}', 'rb') as f:")
+    code.append("    a0 = pickle.load(f)")
+    code.append(f"with open('{mem_i1}', 'rb') as f:")
+    code.append("    a1 = pickle.load(f)")
+    code.append(f"r = np.__getattribute__('{func}')(a0, a1)")
+    code.append(f"with open('{mem_i2}', 'wb') as f:")
+    code.append("    pickle.dump(r, f)")
+    code = '\n'.join(code)
+    return code
